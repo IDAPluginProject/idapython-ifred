@@ -1,0 +1,13 @@
+{
+	"blacklist": [
+		"^Window.",
+		"^navbox.",
+		"^Jump",
+		"ifred:enter",
+		"FormsTest",
+		"^sle:",
+		"TestDesktop",
+		"FocusCLI2",
+		"^msglist:"
+	]
+}

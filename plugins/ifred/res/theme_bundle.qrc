@@ -1,0 +1,7 @@
+<RCC>
+  <qresource prefix="bundle">
+    <file>theme/styles.json</file>
+    <file>theme/window.css</file>
+    <file>config.json</file>
+  </qresource>
+</RCC>
