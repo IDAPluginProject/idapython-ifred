@@ -1,8 +1,6 @@
-from PySide6.QtCore import QFileSystemWatcher, QDir, QFile, QIODevice
-from PySide6.QtGui import *
-from PySide6.QtWidgets import *
 import json as json_lib
 from typing import Callable, Optional
+from .qt_bindings import *
 
 static_updated = False
 from . import api

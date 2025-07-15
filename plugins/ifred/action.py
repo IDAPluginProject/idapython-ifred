@@ -4,5 +4,5 @@ from dataclasses import dataclass
 class Action:
     id: str
     name: str
-    shortcut: str
-    description: str
+    shortcut: str = ""
+    description: str = ""

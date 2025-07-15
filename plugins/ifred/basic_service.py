@@ -1,5 +1,4 @@
-from PySide6.QtCore import QObject, QSettings, Signal
-from PySide6.QtCore import Qt
+from .qt_bindings import *
 from typing import List, Dict, Tuple, Optional
 from rapidfuzz import fuzz
 

@@ -1,11 +1,5 @@
 from typing import Callable, Optional
-from PySide6.QtCore import Qt, QEvent, Signal
-from PySide6.QtGui import QFocusEvent, QKeyEvent, QKeySequence
-from PySide6.QtWidgets import (QMainWindow, QFrame, QLineEdit, QVBoxLayout,
-                              QWidget)
-from PySide6.QtGui import QGuiApplication, QScreen, QShortcut
-from PySide6.QtWidgets import QGraphicsDropShadowEffect
-import json
+from .qt_bindings import *
 
 from .action import Action
 from .filter import SearchService
@@ -79,8 +73,11 @@ class PaletteFrame(QFrame):
     def eventFilter(self, obj: QWidget, event: QEvent) -> bool:
         if event.type() == QEvent.KeyPress:
             key_event: QKeyEvent = event
-            # sequence = QKeySequence(key_event.key() | key_event.modifiers())
-            sequence = QKeySequence(key_event.keyCombination())
+            if QT_API == 'PySide6':
+                sequence = QKeySequence(key_event.keyCombination())
+            else:
+                # TODO
+                sequence = QKeySequence(key_event.key(), int(key_event.modifiers()))
 
             if sequence in self.registered_keys:
                 self.registered_keys[sequence].activated.emit()

@@ -1,12 +1,6 @@
 import json
 from typing import Callable, Optional
-
-from PySide6.QtCore import Qt, QEvent, Signal
-from PySide6.QtGui import QFocusEvent, QKeyEvent, QKeySequence, QColor
-from PySide6.QtWidgets import (QMainWindow, QFrame, QLineEdit, QVBoxLayout,
-                              QWidget)
-from PySide6.QtGui import QGuiApplication, QScreen, QShortcut
-from PySide6.QtWidgets import QGraphicsDropShadowEffect
+from .qt_bindings import *
 
 from .utils import loadFile, load_json
 from .PaletteFrame import PaletteFrame, ActionHandler
