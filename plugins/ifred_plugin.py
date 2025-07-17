@@ -2,8 +2,6 @@ import os, sys
 from typing import List, Dict
 import idaapi
 import ida_name
-import ida_struct
-import ida_enum
 import ida_kernwin
 import ida_nalt
 import ida_registry
@@ -11,6 +9,10 @@ from ifred.qt_bindings import *
 
 from ifred.api import Action, cleanup_palettes, set_path_handler, show_palette
 from ifred.utils import load_json
+
+if idaapi.IDA_SDK_VERSION < 900:
+    import ida_struct 
+    import ida_enum 
 
 # Platform-specific shortcuts
 if sys.platform == "darwin":
@@ -74,30 +76,52 @@ def get_actions() -> List[Action]:
 
 def get_nice_struc_name(sid: int) -> str:
     """Get readable structure name"""
-    name = ida_struct.get_struc_name(sid)
-    if name:
-        tif = idaapi.tinfo_t()
-        if tif.get_named_type(idaapi.get_idati(), name):
-            return str(tif)
-    return name or ""
+    if idaapi.IDA_SDK_VERSION < 900:
+        name = ida_struct.get_struc_name(sid)
+        if name:
+            tif = idaapi.tinfo_t()
+            if tif.get_named_type(idaapi.get_idati(), name):
+                return str(tif)
+        return name or ""
+    else:
+        ti = idaapi.tinfo_t(tid=sid)
+        if ti is not None:
+            return idaapi.get_tid_name(sid)
+        else:
+            return "" 
 
+import idautils 
 def add_structs(result: List[Action]):
     """Add structures to result list"""
-    idx = ida_struct.get_first_struc_idx()
-    while idx != idaapi.BADADDR:
-        sid = ida_struct.get_struc_by_idx(idx)
-        if sid != idaapi.BADADDR:
-            name = get_nice_struc_name(sid)
+    if idaapi.IDA_SDK_VERSION < 900:
+        idx = ida_struct.get_first_struc_idx()
+        while idx != idaapi.BADADDR:
+            sid = ida_struct.get_struc_by_idx(idx)
+            if sid != idaapi.BADADDR:
+                name = get_nice_struc_name(sid)
+                result.append(Action(f"struct:{sid}", name))
+            idx = ida_struct.get_next_struc_idx(idx)
+    else:
+        for ordinal, sid, name in idautils.Structs():
             result.append(Action(f"struct:{sid}", name))
-        idx = ida_struct.get_next_struc_idx(idx)
 
 def add_enums(result: List[Action]):
     """Add enums to result list"""
-    for i in range(ida_enum.get_enum_qty()):
-        enum_id = ida_enum.getn_enum(i)
-        if enum_id != idaapi.BADADDR:
-            name = get_nice_struc_name(enum_id)
-            result.append(Action(f"struct:{enum_id}", name))
+    if idaapi.IDA_SDK_VERSION < 900:
+        for i in range(ida_enum.get_enum_qty()):
+            enum_id = ida_enum.getn_enum(i)
+            if enum_id != idaapi.BADADDR:
+                name = get_nice_struc_name(enum_id)
+                result.append(Action(f"struct:{enum_id}", name))
+    else:
+        limit = idaapi.get_ordinal_limit()
+        for ordinal in range(1, limit):
+            tif = idaapi.tinfo_t()
+            tif.get_numbered_type(None, ordinal)
+            if tif.is_enum():
+                tid = tif.get_tid()
+                name = get_nice_struc_name(tid)
+                result.append(Action(f"struct:{tid}", name))
 
 class NamesManager:
     def __init__(self):
@@ -162,7 +186,7 @@ class NamesManager:
 
     def get(self, clear=False):
         names_count = idaapi.get_nlist_size()
-        structs_count = ida_struct.get_struc_qty()
+        # structs_count = ida_struct.get_struc_qty()
 
         if self.result and not clear:
             return self.result
@@ -231,10 +255,18 @@ class NamePaletteHandler(idaapi.action_handler_t):
         def callback(action):
             if action.id.startswith("struct:"):
                 tid = int(action.id[7:])
-                if ida_enum.get_enum_idx(tid) == idaapi.BADADDR:
-                    ida_kernwin.open_structs_window(tid)
+                if idaapi.IDA_SDK_VERSION < 900:
+                    if ida_enum.get_enum_idx(tid) == idaapi.BADADDR:
+                        ida_kernwin.open_structs_window(tid)
+                    else:
+                        ida_kernwin.open_enums_window(tid)
                 else:
-                    ida_kernwin.open_enums_window(tid)
+                    tif = idaapi.tinfo_t(tid=tid)
+                    if tif is not None:
+                        ida_kernwin.open_til_view_window(tif)
+                    else:
+                        print(f"[palatte] Something error happend, no corespoding structs/enums with tid {hex(tid)}")
+
             else:
                 address = int(action.id, 16)
                 ida_kernwin.jumpto(address)
