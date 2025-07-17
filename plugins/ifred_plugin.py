@@ -5,6 +5,7 @@ import ida_name
 import ida_kernwin
 import ida_nalt
 import ida_registry
+import idautils 
 from ifred.qt_bindings import *
 
 from ifred.api import Action, cleanup_palettes, set_path_handler, show_palette
@@ -74,62 +75,116 @@ def get_actions() -> List[Action]:
 
     return result
 
-def get_nice_struc_name(sid: int) -> str:
+def get_nice_struc_name(tid: int) -> str:
     """Get readable structure name"""
+    """
+    tid is actually ordinal in IDA 9.0 above
+    """
     if idaapi.IDA_SDK_VERSION < 900:
-        name = ida_struct.get_struc_name(sid)
+        name = ida_struct.get_struc_name(tid)
         if name:
             tif = idaapi.tinfo_t()
             if tif.get_named_type(idaapi.get_idati(), name):
                 return str(tif)
         return name or ""
     else:
-        ti = idaapi.tinfo_t(tid=sid)
-        if ti is not None:
-            return idaapi.get_tid_name(sid)
-        else:
-            return "" 
+        ordinal = tid 
+        tif = idaapi.tinfo_t()
+        tif.get_numbered_type(idaapi.get_idati(), ordinal)
+        return tif.dstr()
 
-import idautils 
+
 def add_structs(result: List[Action]):
     """Add structures to result list"""
-    if idaapi.IDA_SDK_VERSION < 900:
-        idx = ida_struct.get_first_struc_idx()
-        while idx != idaapi.BADADDR:
-            sid = ida_struct.get_struc_by_idx(idx)
-            if sid != idaapi.BADADDR:
-                name = get_nice_struc_name(sid)
-                result.append(Action(f"struct:{sid}", name))
-            idx = ida_struct.get_next_struc_idx(idx)
-    else:
-        for ordinal, sid, name in idautils.Structs():
+    idx = ida_struct.get_first_struc_idx()
+    while idx != idaapi.BADADDR:
+        sid = ida_struct.get_struc_by_idx(idx)
+        if sid != idaapi.BADADDR:
+            name = get_nice_struc_name(sid)
             result.append(Action(f"struct:{sid}", name))
+        idx = ida_struct.get_next_struc_idx(idx)
 
 def add_enums(result: List[Action]):
     """Add enums to result list"""
+    for i in range(ida_enum.get_enum_qty()):
+        enum_id = ida_enum.getn_enum(i)
+        if enum_id != idaapi.BADADDR:
+            name = get_nice_struc_name(enum_id)
+            result.append(Action(f"struct:{enum_id}", name))
+
+def add_types(result: List[Action]):
     if idaapi.IDA_SDK_VERSION < 900:
-        for i in range(ida_enum.get_enum_qty()):
-            enum_id = ida_enum.getn_enum(i)
-            if enum_id != idaapi.BADADDR:
-                name = get_nice_struc_name(enum_id)
-                result.append(Action(f"struct:{enum_id}", name))
+        add_structs(result)
+        add_enums(result)
     else:
-        limit = idaapi.get_ordinal_limit()
-        for ordinal in range(1, limit):
-            tif = idaapi.tinfo_t()
-            tif.get_numbered_type(None, ordinal)
-            if tif.is_enum():
-                tid = tif.get_tid()
-                name = get_nice_struc_name(tid)
-                result.append(Action(f"struct:{tid}", name))
+        for ordinal in range(1, idaapi.get_ordinal_count()+1):
+            name = idaapi.get_numbered_type_name(idaapi.get_idati(), ordinal)
+            if name:
+                result.append(Action(f"struct:{ordinal}", get_nice_struc_name(ordinal)))
+
 
 class NamesManager:
+    class IDBHooker(idaapi.IDB_Hooks):
+        def __init__(self, mgr, _flags=0, _hkcb_flags=1):
+            super().__init__(_flags, _hkcb_flags)
+            self.mgr: "NamesManager" = mgr 
+        
+        def renamed(self, ea, new_name, local_name, old_name):
+            self.mgr.rename(ea, new_name) 
+
+        def allsegs_moved(self, info):
+            self.mgr.rebase(info)
+
+        def struc_renamed(self, struc, success):
+            tid = struc.tid 
+            self.mgr.update_struct(tid, get_nice_struc_name(tid))
+
+        def struc_created(self, tid):
+            self.mgr.update_struct(tid, get_nice_struc_name(tid))
+
+        def enum_created(self, tid):
+            self.mgr.update_struct(tid, get_nice_struc_name(tid))
+
+        def enum_renamed(self, tid):
+            self.mgr.update_struct(tid, get_nice_struc_name(tid))
+    
+    class IDBHooker900(idaapi.IDB_Hooks):
+        def __init__(self, mgr, _flags=0, _hkcb_flags=1):
+            super().__init__(_flags, _hkcb_flags)
+            self.mgr = mgr 
+        
+        def renamed(self, ea, new_name, local_name, old_name):
+            self.mgr.rename(ea, new_name) 
+
+        def allsegs_moved(self, info):
+            self.mgr.rebase(info)
+
+        def local_types_changed(self, ltc, ordinal, name):
+            if ltc in [idaapi.LTC_ADDED, idaapi.LTC_ALIASED, idaapi.LTC_EDITED]:
+                # print(f"local_types_changed. ordinal = {ordinal}, name = {name}")
+                self.mgr.update_struct(ordinal, name)
+    
+    class IDPHooker(idaapi.IDP_Hooks):
+        def __init__(self, mgr, *args):
+            super().__init__(*args)
+            self.mgr: "NamesManager" = mgr 
+
+        def ev_term(self):
+            self.mgr.clear()
+
     def __init__(self):
         self.address_to_name = {}
         self.address_to_struct = {}
         self.result = []
-        idaapi.notify_when(idaapi.NW_OPENIDB, self.idb_hooks)
-        idaapi.notify_when(idaapi.NW_TERMIDA, self.idp_hooks)
+        if idaapi.IDA_SDK_VERSION < 900:
+            self.idb_hooker = NamesManager.IDBHooker(self)
+        else:
+            self.idb_hooker = NamesManager.IDBHooker900(self)
+        self.idp_hooker = NamesManager.IDPHooker(self)
+
+        self.idb_hooker.hook()
+        self.idp_hooker.hook()
+        #TODO, when to unhook?
 
     def init(self, names):
         self.address_to_name.clear()
@@ -158,8 +213,8 @@ class NamesManager:
         moves = []
         for seg in infos:
             for key in list(self.address_to_name.keys()):
-                if seg.from_ea <= key < seg.from_ea + seg.size:
-                    moves.append((key, key + seg.to_ea - seg.from_ea))
+                if seg._from <= key and key < seg._from + seg.size:
+                    moves.append((key, key + seg.to - seg._from))
 
         for old_ea, new_ea in moves:
             index = self.address_to_name[old_ea]
@@ -196,36 +251,13 @@ class NamesManager:
         # Add names
         add_names(self.result, names_count)
 
-        # Add structs
-        add_structs(self.result)
-
-        # Add enums
-        add_enums(self.result)
+        # Add types
+        add_types(self.result)
 
         self.init(self.result)
         return self.result
 
-    def idb_hooks(self, nw_code):
-        if nw_code == idaapi.NW_OPENIDB:
-            def hook_callback(hook_type, *args):
-                if hook_type == idaapi.idb_event.allsegs_moved:
-                    self.rebase(args[0])
-                elif hook_type == idaapi.idb_event.renamed:
-                    self.rename(args[0], args[1])
-                elif hook_type == idaapi.idb_event.struc_renamed:
-                    if args[0]:
-                        self.update_struct(args[0].id, get_nice_struc_name(args[0].id))
-                elif hook_type in (idaapi.idb_event.struc_created,
-                                 idaapi.idb_event.enum_created,
-                                 idaapi.idb_event.enum_renamed):
-                    self.update_struct(args[0], get_nice_struc_name(args[0]))
-                return 0
-
-            idaapi.notify_when(idaapi.NW_OPENIDB, hook_callback)
-
-    def idp_hooks(self, nw_code):
-        if nw_code == idaapi.NW_TERMIDA:
-            self.clear()
+   
 
 def get_names(clear=False):
     global _names_manager
@@ -261,11 +293,13 @@ class NamePaletteHandler(idaapi.action_handler_t):
                     else:
                         ida_kernwin.open_enums_window(tid)
                 else:
-                    tif = idaapi.tinfo_t(tid=tid)
+                    ordinal = tid 
+                    tif = idaapi.tinfo_t()
+                    tif.get_numbered_type(None, ordinal)
                     if tif is not None:
                         ida_kernwin.open_til_view_window(tif)
                     else:
-                        print(f"[palatte] Something error happend, no corespoding structs/enums with tid {hex(tid)}")
+                        print(f"[palatte] Something error happend, no corespoding structs/enums with ordinal {ordinal}")
 
             else:
                 address = int(action.id, 16)
