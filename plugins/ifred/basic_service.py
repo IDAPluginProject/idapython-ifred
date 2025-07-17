@@ -10,7 +10,7 @@ class CanceledError(Exception):
     pass
 
 MAX_RECENT_ITEMS = 100
-SAME_THREAD_THRESHOLD = 20000
+SAME_THREAD_THRESHOLD = 1000000
 
 distances: Dict[Tuple[str, str], int] = {}
 def distance(s1: str, s2: str) -> int:
