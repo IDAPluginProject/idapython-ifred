@@ -1,43 +1,43 @@
-# Try PySide6 first
+# Try PyQt5 (ida pro)
 try:
-    from PySide6 import QtCore, QtGui, QtWidgets, QtUiTools
-    from PySide6.QtWidgets import (
+    from PyQt5 import QtCore, QtGui, QtWidgets, uic
+    from PyQt5.QtWidgets import (
         QApplication, QMainWindow, QWidget, QFrame, QLineEdit,
-        QVBoxLayout, QStyle, QStyledItemDelegate,
+        QVBoxLayout, QShortcut, QStyle, QStyledItemDelegate,
         QStyleOptionViewItem, QListView, QAbstractItemView,
         QGraphicsDropShadowEffect)
-    from PySide6.QtCore import (
+    from PyQt5.QtCore import (
         Qt, QRegularExpression, QThread, QObject,
         QAbstractEventDispatcher, QTimer, QFileSystemWatcher,
         QDir, QFile, QIODevice, QEvent, QSize, QRectF,
         QAbstractItemModel, QModelIndex, QSettings)
-    from PySide6.QtGui import (
-        QFocusEvent, QKeyEvent, QKeySequence, QColor, QShortcut,
+    from PyQt5.QtGui import (
+        QFocusEvent, QKeyEvent, QKeySequence, QColor,
         QGuiApplication, QScreen, QPainter, QTextDocument,
         QTextOption)
-    QT_API = 'PySide6'
+
+    Signal = QtCore.pyqtSignal
+    Slot = QtCore.pyqtSlot
+    QT_API = 'PyQt5'
 except ImportError:
-    # Then try PyQt5
+    # Then try PySide6 (for test)
     try:
-        from PyQt5 import QtCore, QtGui, QtWidgets, uic
-        from PyQt5.QtWidgets import (
+        from PySide6 import QtCore, QtGui, QtWidgets, QtUiTools
+        from PySide6.QtWidgets import (
             QApplication, QMainWindow, QWidget, QFrame, QLineEdit,
-            QVBoxLayout, QShortcut, QStyle, QStyledItemDelegate,
+            QVBoxLayout, QStyle, QStyledItemDelegate,
             QStyleOptionViewItem, QListView, QAbstractItemView,
             QGraphicsDropShadowEffect)
-        from PyQt5.QtCore import (
-            Qt, QRegularExpression, QThread, QObject,
+        from PySide6.QtCore import (
+            Qt, QRegularExpression, QThread, QObject, Signal,
             QAbstractEventDispatcher, QTimer, QFileSystemWatcher,
             QDir, QFile, QIODevice, QEvent, QSize, QRectF,
             QAbstractItemModel, QModelIndex, QSettings)
-        from PyQt5.QtGui import (
-            QFocusEvent, QKeyEvent, QKeySequence, QColor,
+        from PySide6.QtGui import (
+            QFocusEvent, QKeyEvent, QKeySequence, QColor, QShortcut,
             QGuiApplication, QScreen, QPainter, QTextDocument,
             QTextOption)
-
-        Signal = QtCore.pyqtSignal
-        Slot = QtCore.pyqtSlot
-        QT_API = 'PyQt5'
+        QT_API = 'PySide6'
     except ImportError as e:
         print(e)
         # Then try PySide2
