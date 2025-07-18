@@ -10,7 +10,7 @@ class CanceledError(Exception):
     pass
 
 MAX_RECENT_ITEMS = 100
-SAME_THREAD_THRESHOLD = 1000000
+SAME_THREAD_THRESHOLD = 20000
 
 distances: Dict[Tuple[str, str], int] = {}
 def distance(s1: str, s2: str) -> int:
@@ -51,13 +51,14 @@ class BasicService(SearchService):
         self.recent_actions = {}
         self.canceled = False
 
-        self.startSearching.connect(self.search)
-        self.itemClicked.connect(self._handle_item_clicked)
-
         self.storage.sync()
         recent_actions_variant = self.storage.value("recent_actions", {})
         self.recent_actions = convert_hash(recent_actions_variant, int)
         self.recent_indexes = [0] * len(self.recent_actions)
+
+    def connectSignals(self):
+        self.startSearching.connect(self.doSearch)
+        self.itemClicked.connect(self._handle_item_clicked)
 
     def _handle_item_clicked(self, id: str):
         to_remove = []
@@ -80,7 +81,7 @@ class BasicService(SearchService):
     def cancel(self):
         self.canceled = True
 
-    def search(self, keyword: str):
+    def doSearch(self, keyword: str):
         nonrecent_count = 0
         recent_count = 0
         recent_actions = dict(self.recent_actions)
@@ -90,6 +91,8 @@ class BasicService(SearchService):
         for i in range(len(self.indexes)):
             if self.canceled:
                 return
+            # TODO profile
+            # if not keyword or fuzz.ratio(keyword, self.actions[i].name) > 20.0:
             if not keyword or fts_fuzzy_match.fuzzy_match_simple(keyword, self.actions[i].name):
                 if self.actions[i].id in recent_actions:
                     self.recent_indexes[recent_count] = i
@@ -110,6 +113,11 @@ class BasicService(SearchService):
             )
 
             if len(keyword) > 1:
+                for i in range(nonrecent_count):
+                    if self.canceled:
+                        raise CanceledError()
+                    idx = self.indexes[i]
+                    self.actions[idx].score = distance(keyword, self.actions[idx].name)
                 def distance_sort_key(idx):
                     if self.canceled:
                         raise CanceledError()
@@ -117,7 +125,8 @@ class BasicService(SearchService):
 
                 self.indexes[:nonrecent_count] = sorted(
                     self.indexes[:nonrecent_count],
-                    key=distance_sort_key
+                    # key=distance_sort_key
+                    key=lambda idx: self.actions[idx].score
                 )
 
         except CanceledError:

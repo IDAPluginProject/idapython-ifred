@@ -2,9 +2,7 @@ from .qt_bindings import *
 from typing import List, Optional
 from dataclasses import dataclass
 
-@dataclass
-class Action:
-    pass  # Action class implementation would go here
+from .action import Action
 
 class PaletteFilter(QAbstractItemModel):
     filteringDone = Signal(int)  # Signal for when filtering is complete
@@ -18,7 +16,14 @@ class PaletteFilter(QAbstractItemModel):
 
         self.setSearchService(search_service)
         self.search_service.doneSearching.connect(self.onDoneSearching, Qt.QueuedConnection)
-        self.destroyed.connect(self.onDestroy)
+
+        # NOTE self is a QObject now, so can't find instance method
+        def onDestroy():
+            self.search_service.cancel()
+            self.search_worker.quit()
+            self.search_worker.wait()
+        # self.destroyed.connect(self.onDestroy)
+        self.destroyed.connect(onDestroy)
 
     def setFilter(self, keyword: str) -> None:
         self.search_service.search(keyword)
@@ -36,9 +41,12 @@ class PaletteFilter(QAbstractItemModel):
             self.search_worker.destroyed.connect(self.search_service.deleteLater)
             self.search_service.setParent(None)
             self.search_service.moveToThread(self.search_worker)
+            # XXX PyQt5 differ from PySide6 and native Qt
+            self.search_service.connectSignals()
             self.search_worker.start()
         else:
             self.search_service.setParent(self)
+            self.search_service.connectSignals()
 
     def index(self, row: int, column: int, parent: QModelIndex = QModelIndex()) -> QModelIndex:
         return self.createIndex(row, column)
@@ -89,3 +97,6 @@ class SearchService(QObject):
 
     def runInSeparateThread(self) -> bool:
         raise NotImplementedError("Subclasses must implement runInSeparateThread()")
+
+    def connectSignals(self):
+        raise NotImplementedError("Subclasses must implement connectSignals()")

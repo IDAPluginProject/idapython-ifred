@@ -1,19 +1,16 @@
 import os, sys
-from PySide6.QtCore import Qt, Signal, QObject
-from PySide6.QtWidgets import QApplication
 import random
-import string
-import threading
 
 basedir = os.path.abspath(os.path.dirname(__file__))
 sys.path.append(os.path.abspath(basedir + "/../"))
-from ifred.CommandPalette import CommandPalette
+
+from ifred.qt_bindings import *
 from ifred.filter import SearchService
 from ifred.api import set_path_handler
 from ifred.action import Action
+from ifred.CommandPalette import CommandPalette
 
 COUNT = 500000
-COUNT = 500
 
 def random_key():
     keys = ["Shift"]
@@ -66,7 +63,7 @@ class CustomService(SearchService):
         pass
 
     def runInSeparateThread(self) -> bool:
-        return False
+        return True
 
 def TestPluginPath(name):
     return f"{basedir}/res/{name}"
