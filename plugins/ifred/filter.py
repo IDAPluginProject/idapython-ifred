@@ -15,6 +15,8 @@ class PaletteFilter(QAbstractItemModel):
         self.keyword: str = ""
         self.worker_thread = QThread(self)
         self.search_service = search_service
+        self.timer = QTimer()
+        self.timer.setSingleShot(True)
 
 
         if self.search_service.runInSeparateThread():
@@ -41,8 +43,22 @@ class PaletteFilter(QAbstractItemModel):
         self.destroyed.connect(onDestroy)
 
     def setFilter(self, keyword: str) -> None:
-        self.search_service.cancel()
-        self.startSearching.emit(keyword)
+        if self.timer.isActive():
+            self.timer.stop()
+        
+        # Safely disconnect previous connections to avoid accumulation
+        try:
+            self.timer.timeout.disconnect()
+        except TypeError:
+            # No connections exist yet, which is fine
+            pass
+        
+        # Capture keyword in closure (not lambda parameter)
+        self.timer.timeout.connect(lambda: (
+            self.search_service.cancel(),
+            self.startSearching.emit(keyword)
+        ))
+        self.timer.start(300)  # 300ms delay for debouncing
 
     def filter(self) -> str:
         return self.keyword
