@@ -5,15 +5,15 @@ import ida_name
 import ida_kernwin
 import ida_nalt
 import ida_registry
-import idautils 
+import idautils
 from ifred.qt_bindings import *
 
 from ifred.api import Action, cleanup_palettes, set_path_handler, show_palette
 from ifred.utils import load_json
 
 if idaapi.IDA_SDK_VERSION < 900:
-    import ida_struct 
-    import ida_enum 
+    import ida_struct
+    import ida_enum
 
 # Platform-specific shortcuts
 if sys.platform == "darwin":
@@ -88,7 +88,7 @@ def get_nice_struc_name(tid: int) -> str:
                 return str(tif)
         return name or ""
     else:
-        ordinal = tid 
+        ordinal = tid
         tif = idaapi.tinfo_t()
         tif.get_numbered_type(idaapi.get_idati(), ordinal)
         return tif.dstr()
@@ -127,16 +127,16 @@ class NamesManager:
     class IDBHooker(idaapi.IDB_Hooks):
         def __init__(self, mgr, _flags=0, _hkcb_flags=1):
             super().__init__(_flags, _hkcb_flags)
-            self.mgr: "NamesManager" = mgr 
-        
+            self.mgr: "NamesManager" = mgr
+
         def renamed(self, ea, new_name, local_name, old_name):
-            self.mgr.rename(ea, new_name) 
+            self.mgr.rename(ea, new_name)
 
         def allsegs_moved(self, info):
             self.mgr.rebase(info)
 
         def struc_renamed(self, struc, success):
-            tid = struc.tid 
+            tid = struc.tid
             self.mgr.update_struct(tid, get_nice_struc_name(tid))
 
         def struc_created(self, tid):
@@ -147,14 +147,14 @@ class NamesManager:
 
         def enum_renamed(self, tid):
             self.mgr.update_struct(tid, get_nice_struc_name(tid))
-    
+
     class IDBHooker900(idaapi.IDB_Hooks):
         def __init__(self, mgr, _flags=0, _hkcb_flags=1):
             super().__init__(_flags, _hkcb_flags)
-            self.mgr = mgr 
-        
+            self.mgr = mgr
+
         def renamed(self, ea, new_name, local_name, old_name):
-            self.mgr.rename(ea, new_name) 
+            self.mgr.rename(ea, new_name)
 
         def allsegs_moved(self, info):
             self.mgr.rebase(info)
@@ -163,11 +163,11 @@ class NamesManager:
             if ltc in [idaapi.LTC_ADDED, idaapi.LTC_ALIASED, idaapi.LTC_EDITED]:
                 # print(f"local_types_changed. ordinal = {ordinal}, name = {name}")
                 self.mgr.update_struct(ordinal, name)
-    
+
     class IDPHooker(idaapi.IDP_Hooks):
         def __init__(self, mgr, *args):
             super().__init__(*args)
-            self.mgr: "NamesManager" = mgr 
+            self.mgr: "NamesManager" = mgr
 
         def ev_term(self):
             self.mgr.clear()
@@ -257,7 +257,7 @@ class NamesManager:
         self.init(self.result)
         return self.result
 
-   
+
 
 def get_names(clear=False):
     global _names_manager
@@ -293,13 +293,16 @@ class NamePaletteHandler(idaapi.action_handler_t):
                     else:
                         ida_kernwin.open_enums_window(tid)
                 else:
-                    ordinal = tid 
+                    ordinal = tid
                     tif = idaapi.tinfo_t()
                     tif.get_numbered_type(None, ordinal)
-                    if tif is not None:
-                        ida_kernwin.open_til_view_window(tif)
+                    if hasattr(ida_kernwin, "open_til_view_window"):
+                        if tif is not None:
+                            ida_kernwin.open_til_view_window(tif)
+                        else:
+                            print(f"[palatte] Something error happend, no corespoding structs/enums with ordinal {ordinal}")
                     else:
-                        print(f"[palatte] Something error happend, no corespoding structs/enums with ordinal {ordinal}")
+                        ida_kernwin.open_loctypes_window(ordinal)
 
             else:
                 address = int(action.id, 16)
