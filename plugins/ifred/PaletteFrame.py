@@ -10,7 +10,6 @@ ActionHandler = Callable[[Action], bool]
 
 class PaletteFrame(QFrame):
     item_clicked = Signal(Action)
-
     def __init__(self, parent: QWidget, name: str, close_key: str, search_service: SearchService):
         super().__init__(parent)
         self.name = name
@@ -35,9 +34,7 @@ class PaletteFrame(QFrame):
         self.searchbox.returnPressed.connect(self._handle_return)
         self.searchbox.textChanged.connect(self._handle_text_changed)
         self.items.clicked.connect(self._handle_item_clicked)
-        self.item_clicked.connect(lambda action:
-            self.items.model().searchService().itemClicked.emit(action.id))
-
+        
         # Install event filters
         self.searchbox.installEventFilter(self)
         self.items.installEventFilter(self)
@@ -52,6 +49,9 @@ class PaletteFrame(QFrame):
         self.register_shortcut(QKeySequence("Ctrl+J"), lambda: self._arrow_pressed(-1))
         self.register_shortcut(QKeySequence("Ctrl+K"), lambda: self._arrow_pressed(1))
         self.register_shortcut(QKeySequence("Esc"), lambda: self.window().close())
+
+    def setItemClickedHandler(self, func: ActionHandler):
+        self.action_handler = func 
 
     def register_shortcut(self, sequence: QKeySequence, callback: Callable):
         # Handle Meta key like Ctrl on macOS
@@ -115,7 +115,8 @@ class PaletteFrame(QFrame):
         if self.items.model().rowCount():
             action = self.items.currentIndex().data()
             self.window().hide()
-            self.item_clicked.emit(action)
+            self.items.handle_item_clicked(action)
+            self.action_handler(action)
             self.window().close()
 
     def _handle_text_changed(self, text: str):
@@ -125,5 +126,6 @@ class PaletteFrame(QFrame):
     def _handle_item_clicked(self, index):
         action = index.data()
         self.window().hide()
-        self.item_clicked.emit(action)
+        self.items.handle_item_clicked(action)
+        self.action_handler(action)
         self.window().close()

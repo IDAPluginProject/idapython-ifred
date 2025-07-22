@@ -1,7 +1,7 @@
 from .qt_bindings import *
 from typing import List, Dict, Tuple, Optional
 from rapidfuzz import fuzz
-
+import threading 
 from .action import Action
 from .filter import SearchService
 from . import fts_fuzzy_match
@@ -56,11 +56,7 @@ class BasicService(SearchService):
         self.recent_actions = convert_hash(recent_actions_variant, int)
         self.recent_indexes = [0] * len(self.recent_actions)
 
-    def connectSignals(self):
-        self.startSearching.connect(self.doSearch)
-        self.itemClicked.connect(self._handle_item_clicked)
-
-    def _handle_item_clicked(self, id: str):
+    def handle_item_clicked(self, action: Action):
         to_remove = []
         for key in self.recent_actions:
             self.recent_actions[key] += 1
@@ -70,7 +66,7 @@ class BasicService(SearchService):
         for key in to_remove:
             del self.recent_actions[key]
 
-        self.recent_actions[id] = 0
+        self.recent_actions[action.id] = 0
         self.storage.setValue("recent_actions",
                             convert_hash(self.recent_actions, any))
         self.storage.sync()
