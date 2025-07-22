@@ -154,3 +154,6 @@ class PaletteItems(QListView):
 
     def __del__(self):
         del self.model_
+
+    def handle_item_clicked(self, action):
+        self.model_.handle_item_clicked(action)

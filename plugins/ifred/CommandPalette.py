@@ -37,7 +37,7 @@ class CommandPalette(QMainWindow):
 
         inner = PaletteFrame(self, name, close_key, search_service)
         self.setCentralWidget(inner)
-        inner.item_clicked.connect(func)
+        inner.setItemClickedHandler(func)
         inner.setPlaceholderText(placeholder)
 
         super().show()
